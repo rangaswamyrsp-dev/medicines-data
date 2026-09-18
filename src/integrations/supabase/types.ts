@@ -14,16 +14,208 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          id: number
+          sheet_name: string
+          spreadsheet_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          sheet_name?: string
+          spreadsheet_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          sheet_name?: string
+          spreadsheet_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory: {
+        Row: {
+          batch_code: string
+          created_at: string
+          expiry_month: number
+          expiry_year: number
+          id: string
+          item_name: string
+          manufacturer: string
+          mrp: number
+          no_of_pack: number
+          pack_size: string
+          sheet_error: string | null
+          sheet_synced: boolean
+          type: string
+          units: string
+          updated_at: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          batch_code: string
+          created_at?: string
+          expiry_month: number
+          expiry_year: number
+          id?: string
+          item_name: string
+          manufacturer: string
+          mrp: number
+          no_of_pack: number
+          pack_size: string
+          sheet_error?: string | null
+          sheet_synced?: boolean
+          type: string
+          units: string
+          updated_at?: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          batch_code?: string
+          created_at?: string
+          expiry_month?: number
+          expiry_year?: number
+          id?: string
+          item_name?: string
+          manufacturer?: string
+          mrp?: number
+          no_of_pack?: number
+          pack_size?: string
+          sheet_error?: string | null
+          sheet_synced?: boolean
+          type?: string
+          units?: string
+          updated_at?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
+      item_types: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          type_name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          type_name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          type_name?: string
+        }
+        Relationships: []
+      }
+      manufacturers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          manufacturer_name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          manufacturer_name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          manufacturer_name?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      units: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          unit_name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          unit_name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          unit_name?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      ensure_profile: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +342,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
