@@ -13,7 +13,7 @@ async function fetchLookup(kind: LookupKind): Promise<string[]> {
   const { table, column } = config[kind];
   const { data, error } = await supabase.from(table).select(column).order(column);
   if (error) throw error;
-  return (data as Record<string, string>[]).map((r) => r[column]);
+  return ((data ?? []) as unknown as Record<string, string>[]).map((r) => r[column] ?? "").filter(Boolean);
 }
 
 export function useLookups() {

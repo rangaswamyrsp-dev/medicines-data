@@ -53,7 +53,7 @@ function quoteSheet(name: string) {
 export function parseSpreadsheetId(input: string): string | null {
   const trimmed = input.trim();
   const m = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (m) return m[1];
+  if (m?.[1]) return m[1];
   if (/^[a-zA-Z0-9-_]{20,}$/.test(trimmed)) return trimmed;
   return null;
 }
