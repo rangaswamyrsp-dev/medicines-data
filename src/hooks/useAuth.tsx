@@ -16,62 +16,35 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+const defaultUser = {
+  id: "00000000-0000-0000-0000-000000000001",
+  email: "user@inventory.local",
+} as unknown as User;
+
+const defaultProfile = {
+  id: "00000000-0000-0000-0000-000000000001",
+  name: "Operator",
+  email: "user@inventory.local",
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<AuthState["profile"]>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadProfile = async (s: Session | null) => {
-      if (!s) {
-        setProfile(null);
-        setRole(null);
-        setLoading(false);
-        return;
-      }
-      // Creates the profile on first login and assigns a role (first user = admin).
-      const { data: r } = await supabase.rpc("ensure_profile");
-      const { data: p } = await supabase.from("profiles").select("id, name, email").eq("id", s.user.id).maybeSingle();
-      if (!active) return;
-      setRole((r as AppRole) ?? "user");
-      setProfile(p ?? null);
-      setLoading(false);
-    };
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      loadProfile(data.session);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
-      setSession(s);
-      // Defer backend calls out of the auth callback.
-      setTimeout(() => loadProfile(s), 0);
-    });
-
-    return () => {
-      active = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, profile, role, isAdmin: role === "admin", loading, signOut }}
+      value={{
+        session: null,
+        user: defaultUser,
+        profile: defaultProfile,
+        role: "admin",
+        isAdmin: true,
+        loading: false,
+        signOut: async () => {},
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

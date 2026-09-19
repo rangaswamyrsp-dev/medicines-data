@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
-import { addInventory } from "@/lib/inventory.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useLookups } from "@/hooks/useLookups";
 import { ComboboxWithAdd } from "@/components/ComboboxWithAdd";
@@ -17,9 +15,9 @@ export const Route = createFileRoute("/_authenticated/entry")({
   head: () => ({
     meta: [
       { title: "Add Inventory | Medicine Inventory" },
-      { name: "description", content: "Add medicine stock entries that sync straight to your Google Sheet." },
+      { name: "description", content: "Add medicine stock entries saved directly to Supabase PostgreSQL." },
       { property: "og:title", content: "Add Inventory | Medicine Inventory" },
-      { property: "og:description", content: "Add medicine stock entries that sync straight to your Google Sheet." },
+      { property: "og:description", content: "Add medicine stock entries saved directly to Supabase PostgreSQL." },
     ],
   }),
   component: EntryPage,
@@ -49,7 +47,6 @@ function EntryPage() {
   const itemRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const { manufacturers, types, units, addLookup } = useLookups();
-  const save = useServerFn(addInventory);
 
   useEffect(() => {
     itemRef.current?.focus();
@@ -58,13 +55,17 @@ function EntryPage() {
   const recent = useQuery({
     queryKey: ["recent-entries"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("inventory")
-        .select("id, item_name, manufacturer, no_of_pack, units, expiry_month, expiry_year, created_at")
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("inventory")
+          .select("id, item_name, manufacturer, batch_code, no_of_pack, units, expiry_month, expiry_year, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (error) return [];
+        return data ?? [];
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -78,26 +79,55 @@ function EntryPage() {
     setSaving(true);
     setErrors({});
     try {
-      const res = await save({
-        data: {
-          ...form,
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                "Database request timed out. Please verify your internet connection or check Supabase."
+              )
+            ),
+          10000
+        )
+      );
+
+      const insertPromise = supabase
+        .from("inventory")
+        .insert({
+          user_name: "Operator",
+          item_name: form.item_name.trim(),
+          manufacturer: form.manufacturer.trim(),
+          type: form.type.trim(),
+          batch_code: form.batch_code.trim(),
+          pack_size: form.pack_size.trim(),
           no_of_pack: Number(form.no_of_pack),
+          units: form.units.trim(),
           mrp: Number(form.mrp),
           expiry_month: Number(form.expiry_month),
           expiry_year: Number(form.expiry_year),
-        },
-      });
+        })
+        .select()
+        .single();
+
+      const res: any = await Promise.race([insertPromise, timeoutPromise]);
+      if (res?.error) {
+        console.error("Supabase insert error:", res.error);
+        const errMsg = res.error.message || res.error.details || "Database error saving medicine";
+        throw new Error(errMsg);
+      }
+
       setForm({ ...empty });
       setSuccess(true);
       setTimeout(() => setSuccess(false), 4000);
       itemRef.current?.focus();
       qc.invalidateQueries({ queryKey: ["recent-entries"] });
       qc.invalidateQueries({ queryKey: ["records"] });
-      if (res.sheetSynced) toast.success("Medicine added and sent to the sheet");
-      else toast.warning(`Saved, but not added to the sheet: ${res.sheetError}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not save the record";
-      toast.error(msg);
+      qc.invalidateQueries({ queryKey: ["inventory-distinct-lookups"] });
+      toast.success("Medicine added to database successfully!");
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      const msg = err?.message || (typeof err === "string" ? err : "Could not save the record");
+      toast.error(msg, { duration: 6000 });
     } finally {
       setSaving(false);
     }
@@ -106,8 +136,8 @@ function EntryPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold md:text-2xl">Add Inventory</h1>
-        <p className="text-sm text-muted-foreground">Every saved record is appended to your Google Sheet.</p>
+        <h1 className="text-xl font-bold md:text-2xl">Add Medicine Stock</h1>
+        <p className="text-xs text-muted-foreground">Entries are saved directly to your Supabase PostgreSQL database.</p>
       </div>
 
       {success && (
@@ -124,19 +154,19 @@ function EntryPage() {
           </div>
 
           <ComboboxWithAdd id="manufacturer" label="Manufacturer" value={form.manufacturer} onChange={(v) => set("manufacturer", v)} options={manufacturers} onAdd={(n) => addLookup("manufacturers", n)} addTitle="Add New Manufacturer" placeholder="Select manufacturer" error={errors["manufacturer"]} />
-          <ComboboxWithAdd id="type" label="Type" value={form.type} onChange={(v) => set("type", v)} options={types} onAdd={(n) => addLookup("types", n)} addTitle="Add New Type" placeholder="Select type" error={errors["type"]} />
-
           <div className="space-y-1.5">
             <Label htmlFor="batch_code" className="field-label">Batch Code <span className="text-destructive">*</span></Label>
             <Input id="batch_code" required className="touch-control" value={form.batch_code} onChange={(e) => set("batch_code", e.target.value)} />
           </div>
+          <ComboboxWithAdd id="type" label="Type" value={form.type} onChange={(v) => set("type", v)} options={types} onAdd={(n) => addLookup("types", n)} addTitle="Add New Type" placeholder="Select type" error={errors["type"]} />
+
           <div className="space-y-1.5">
             <Label htmlFor="pack_size" className="field-label">Pack Size <span className="text-destructive">*</span></Label>
             <Input id="pack_size" required className="touch-control" value={form.pack_size} onChange={(e) => set("pack_size", e.target.value)} placeholder="e.g. 10x10" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="no_of_pack" className="field-label">No. of Pack <span className="text-destructive">*</span></Label>
-            <Input id="no_of_pack" type="number" inputMode="decimal" min="0" step="any" required className="touch-control" value={form.no_of_pack} onChange={(e) => set("no_of_pack", e.target.value)} />
+            <Label htmlFor="no_of_pack" className="field-label">No. of Qty <span className="text-destructive">*</span></Label>
+            <Input id="no_of_pack" type="number" inputMode="decimal" min="0" step="any" required className="touch-control" value={form.no_of_pack} onChange={(e) => set("no_of_pack", e.target.value)} placeholder="e.g. 10" />
           </div>
 
           <ComboboxWithAdd id="units" label="Units" value={form.units} onChange={(v) => set("units", v)} options={units} onAdd={(n) => addLookup("units", n)} addTitle="Add New Unit" placeholder="Select unit" error={errors["units"]} />
@@ -169,8 +199,8 @@ function EntryPage() {
           </div>
         </div>
 
-        <Button type="submit" size="xl" className="w-full" disabled={saving}>
-          {saving ? "Saving…" : "Add Inventory"}
+        <Button type="submit" size="xl" className="w-full text-base font-semibold shadow-sm" disabled={saving}>
+          {saving ? "Saving to database…" : "Save to Database"}
         </Button>
       </form>
 
@@ -182,9 +212,11 @@ function EntryPage() {
               <li key={r.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div>
                   <p className="font-medium">{r.item_name}</p>
-                  <p className="text-xs text-muted-foreground">{r.manufacturer} · {r.no_of_pack} {r.units}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.manufacturer} · Qty: <span className="font-semibold text-foreground">{r.no_of_pack} {r.units}</span> · Batch: <span className="font-mono">{r.batch_code}</span>
+                  </p>
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground shrink-0">
                   Exp {String(r.expiry_month).padStart(2, "0")}/{r.expiry_year}
                 </span>
               </li>
