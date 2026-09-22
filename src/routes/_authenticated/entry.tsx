@@ -169,7 +169,44 @@ function EntryPage() {
             <Input id="no_of_pack" type="number" inputMode="decimal" min="0" step="any" required className="touch-control" value={form.no_of_pack} onChange={(e) => set("no_of_pack", e.target.value)} placeholder="e.g. 10" />
           </div>
 
-          <ComboboxWithAdd id="units" label="Units" value={form.units} onChange={(v) => set("units", v)} options={units} onAdd={(n) => addLookup("units", n)} addTitle="Add New Unit" placeholder="Select unit" error={errors["units"]} />
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="units" className="field-label">Units <span className="text-destructive">*</span></Label>
+              <span className="text-[11px] text-muted-foreground">Type any format (e.g. 30ml, 500gm, 5g, 1)</span>
+            </div>
+            <Input
+              id="units"
+              required
+              className="touch-control"
+              value={form.units}
+              onChange={(e) => set("units", e.target.value)}
+              placeholder="e.g. 30ml, 50ml, 500gm, 5g, 1, Tablets"
+              list="units-suggestions"
+              autoComplete="off"
+            />
+            <datalist id="units-suggestions">
+              {units.map((u) => (
+                <option key={u} value={u} />
+              ))}
+            </datalist>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {["30ml", "50ml", "80ml", "100ml", "500gm", "5g", "Tablets", "Capsules", "Bottles", "Strips", "1"].map((quickUnit) => (
+                <button
+                  key={quickUnit}
+                  type="button"
+                  onClick={() => set("units", quickUnit)}
+                  className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
+                    form.units === quickUnit
+                      ? "bg-primary text-primary-foreground border-primary font-medium"
+                      : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border-border"
+                  }`}
+                >
+                  {quickUnit}
+                </button>
+              ))}
+            </div>
+            {errors["units"] && <p className="text-sm text-destructive">{errors["units"]}</p>}
+          </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="mrp" className="field-label">MRP <span className="text-destructive">*</span></Label>
