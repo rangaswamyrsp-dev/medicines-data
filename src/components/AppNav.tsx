@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ClipboardList, PlusCircle } from "lucide-react";
+import { ClipboardList, PlusCircle, Settings } from "lucide-react";
 
 export function AppNav() {
   const items = [
     { to: "/entry", label: "Add Stock", icon: PlusCircle },
     { to: "/records", label: "Records", icon: ClipboardList },
+    { to: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -29,8 +30,8 @@ export function AppNav() {
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar: Clean 2 tabs with large touch targets */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 border-t bg-card/95 backdrop-blur md:hidden shadow-lg pb-safe">
+      {/* Mobile Bottom Navigation Bar: Clean 3 tabs with large touch targets */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-card/95 backdrop-blur md:hidden shadow-lg pb-safe">
         {items.map((i) => (
           <Link
             key={i.to}

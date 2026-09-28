@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { AddMedicineForm } from "@/components/AddMedicineForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,13 +95,14 @@ function RecordsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deleteRow, setDeleteRow] = useState<Row | null>(null);
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   // Fetch records directly from Supabase PostgreSQL
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["records"],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("inventory")
           .select("*")
           .order("created_at", { ascending: false })
@@ -121,7 +123,7 @@ function RecordsPage() {
   // Direct Quantity Stepper (+ / -) mutation
   const adjustQty = useMutation({
     mutationFn: async ({ id, newQty }: { id: string; newQty: number }) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("inventory")
         .update({ no_of_pack: newQty, updated_at: new Date().toISOString() })
         .eq("id", id);
@@ -148,7 +150,7 @@ function RecordsPage() {
   // Edit record mutation
   const update = useMutation({
     mutationFn: async (row: Row) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("inventory")
         .update({
           item_name: row.item_name.trim(),
@@ -178,7 +180,7 @@ function RecordsPage() {
   // Delete record mutation
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("inventory").delete().eq("id", id);
+      const { error } = await (supabase as any).from("inventory").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -248,10 +250,21 @@ function RecordsPage() {
             {rows.length} {rows.length === 1 ? "medicine" : "medicines"} in database
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportCsv} className="h-9 gap-1.5 shadow-2xs">
-          <Download className="h-4 w-4" />
-          <span className="hidden sm:inline">Export</span> CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setIsAddOpen(true)}
+            className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+          >
+            <Plus className="h-4 w-4" />
+            + Add Medicine
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCsv} className="h-9 gap-1.5 shadow-2xs">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span> CSV
+          </Button>
+        </div>
       </div>
 
       {/* Prominent Search Bar */}
@@ -666,6 +679,19 @@ function RecordsPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Medicine Dialog Modal */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="pb-1">
+            <DialogTitle className="text-lg font-bold">Add Medicine Stock</DialogTitle>
+          </DialogHeader>
+          <AddMedicineForm
+            onSuccess={() => setIsAddOpen(false)}
+            onCancel={() => setIsAddOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 

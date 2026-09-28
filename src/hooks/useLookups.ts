@@ -95,20 +95,21 @@ export function useLookups() {
     queryKey: ["inventory-distinct-lookups"],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("inventory")
           .select("manufacturer, type, units");
         if (error || !data) return { manufacturers: [], types: [], units: [] };
 
+        const rows = data as Array<{ manufacturer?: string; type?: string; units?: string }>;
         const manufacturers = [
-          ...new Set(data.map((r) => r.manufacturer?.trim()).filter(Boolean)),
-        ];
+          ...new Set(rows.map((r) => r.manufacturer?.trim()).filter(Boolean)),
+        ] as string[];
         const types = [
-          ...new Set(data.map((r) => r.type?.trim()).filter(Boolean)),
-        ];
+          ...new Set(rows.map((r) => r.type?.trim()).filter(Boolean)),
+        ] as string[];
         const units = [
-          ...new Set(data.map((r) => r.units?.trim()).filter(Boolean)),
-        ];
+          ...new Set(rows.map((r) => r.units?.trim()).filter(Boolean)),
+        ] as string[];
 
         return { manufacturers, types, units };
       } catch {
