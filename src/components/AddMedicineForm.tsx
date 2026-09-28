@@ -365,7 +365,23 @@ export function AddMedicineForm({ onSuccess, onCancel, standalone = false }: Add
         {mode === "general" ? (
           /* QUICK GENERAL ITEM MODE (Matches Screenshot 1) */
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <Label htmlFor="barcode_quick" className="text-xs font-semibold flex items-center gap-1">
+                  <Barcode className="h-3.5 w-3.5 text-primary" /> Barcode / GTIN
+                </Label>
+                <Input
+                  id="barcode_quick"
+                  placeholder="e.g. 8901138821913"
+                  value={form.barcode}
+                  onChange={(e) => {
+                    setField("barcode", e.target.value);
+                    setBarcodeInput(e.target.value);
+                  }}
+                  className="h-10 text-sm font-mono"
+                />
+              </div>
+
               <div className="space-y-1">
                 <Label htmlFor="item_name" className="text-xs font-semibold">
                   Item Name <span className="text-destructive">*</span>
@@ -484,19 +500,37 @@ export function AddMedicineForm({ onSuccess, onCancel, standalone = false }: Add
         ) : (
           /* MEDICINE FULL DETAILS MODE */
           <div className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="item_name_full" className="text-xs font-semibold">
-                Item Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="item_name_full"
-                ref={itemNameRef}
-                required
-                placeholder="e.g. Paracetamol 500mg"
-                value={form.item_name}
-                onChange={(e) => setField("item_name", e.target.value)}
-                className="h-10 text-sm"
-              />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <Label htmlFor="barcode_full" className="text-xs font-semibold flex items-center gap-1">
+                  <Barcode className="h-3.5 w-3.5 text-primary" /> Barcode / GTIN
+                </Label>
+                <Input
+                  id="barcode_full"
+                  placeholder="e.g. 8901138821913"
+                  value={form.barcode}
+                  onChange={(e) => {
+                    setField("barcode", e.target.value);
+                    setBarcodeInput(e.target.value);
+                  }}
+                  className="h-10 text-sm font-mono"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <Label htmlFor="item_name_full" className="text-xs font-semibold">
+                  Item Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="item_name_full"
+                  ref={itemNameRef}
+                  required
+                  placeholder="e.g. Paracetamol 500mg"
+                  value={form.item_name}
+                  onChange={(e) => setField("item_name", e.target.value)}
+                  className="h-10 text-sm"
+                />
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">

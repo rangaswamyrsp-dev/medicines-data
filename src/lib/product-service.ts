@@ -94,20 +94,41 @@ export async function findLocalProduct(barcode: string): Promise<{
   // 3. Find any existing inventory batches in Supabase matching this item
   const existingBatches: BatchInventoryEntry[] = [];
   try {
-    // Search inventory table by item_name or batch_code matching
-    let query = supabase.from("inventory").select("*");
-    if (cachedProduct) {
-      query = query.ilike("item_name", cachedProduct.product_name);
-    } else {
-      query = query.or(`batch_code.eq.${cleanBarcode},item_name.ilike.%${cleanBarcode}%`);
+    let invRows: any[] | null = null;
+
+    // Search inventory table by barcode column first
+    try {
+      const bRes = await (supabase as any)
+        .from("inventory")
+        .select("*")
+        .eq("barcode", cleanBarcode)
+        .limit(20);
+      if (!bRes.error && bRes.data && bRes.data.length > 0) {
+        invRows = bRes.data;
+      }
+    } catch {
+      // Column might not exist yet
     }
 
-    const { data: invRows } = (await query.limit(20)) as { data: any[] | null };
+    // Fallback: search by item_name or batch_code
+    if (!invRows || invRows.length === 0) {
+      let query = (supabase as any).from("inventory").select("*");
+      if (cachedProduct) {
+        query = query.ilike("item_name", cachedProduct.product_name);
+      } else {
+        query = query.or(`batch_code.eq.${cleanBarcode},item_name.ilike.%${cleanBarcode}%`);
+      }
+      const res = await query.limit(20);
+      if (!res.error && res.data) {
+        invRows = res.data;
+      }
+    }
+
     if (invRows && invRows.length > 0) {
       for (const row of invRows) {
         existingBatches.push({
           id: row.id,
-          barcode: cleanBarcode,
+          barcode: row.barcode || cleanBarcode,
           item_name: row.item_name,
           manufacturer: row.manufacturer,
           type: row.type,
@@ -127,7 +148,7 @@ export async function findLocalProduct(barcode: string): Promise<{
         const first = invRows[0];
         cachedProduct = {
           id: first.id,
-          barcode: cleanBarcode,
+          barcode: first.barcode || cleanBarcode,
           product_name: first.item_name,
           brand_name: first.manufacturer,
           manufacturer: first.manufacturer,
@@ -292,24 +313,40 @@ export async function saveVerifiedProduct(params: {
     // If table doesn't exist, local cache handles product master seamlessly
   }
 
-  // 3. Save batch to Supabase inventory table
-  const { data: invData, error: invError } = await (supabase as any)
+  // 3. Save batch to Supabase inventory table including barcode number
+  const inventoryPayload: any = {
+    user_name: params.userName || "Operator",
+    item_name: productMasterEntry.product_name,
+    manufacturer: productMasterEntry.manufacturer || "Unknown",
+    type: productMasterEntry.product_type || "Other",
+    batch_code: params.batch.batch_code.trim(),
+    pack_size: params.batch.pack_size.trim(),
+    no_of_pack: Number(params.batch.no_of_pack),
+    units: params.batch.units.trim(),
+    mrp: Number(params.batch.mrp),
+    expiry_month: Number(params.batch.expiry_month),
+    expiry_year: Number(params.batch.expiry_year),
+    barcode: cleanBarcode || null,
+  };
+
+  let { data: invData, error: invError } = await (supabase as any)
     .from("inventory")
-    .insert({
-      user_name: params.userName || "Operator",
-      item_name: productMasterEntry.product_name,
-      manufacturer: productMasterEntry.manufacturer || "Unknown",
-      type: productMasterEntry.product_type || "Other",
-      batch_code: params.batch.batch_code.trim(),
-      pack_size: params.batch.pack_size.trim(),
-      no_of_pack: Number(params.batch.no_of_pack),
-      units: params.batch.units.trim(),
-      mrp: Number(params.batch.mrp),
-      expiry_month: Number(params.batch.expiry_month),
-      expiry_year: Number(params.batch.expiry_year),
-    })
+    .insert(inventoryPayload)
     .select("id")
     .single();
+
+  // If DB schema doesn't have the barcode column yet, retry without barcode column
+  if (invError && invError.message?.includes("column inventory.barcode does not exist")) {
+    console.warn("inventory.barcode column not present in DB schema yet. Falling back without barcode column.");
+    delete inventoryPayload.barcode;
+    const retry = await (supabase as any)
+      .from("inventory")
+      .insert(inventoryPayload)
+      .select("id")
+      .single();
+    invData = retry.data;
+    invError = retry.error;
+  }
 
   if (invError) {
     console.error("Error inserting inventory batch:", invError);

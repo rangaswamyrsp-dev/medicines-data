@@ -72,7 +72,7 @@ USING (true);
 GRANT ALL ON public.product_master TO anon, authenticated;
 
 -- ==============================================================================
--- 2. BATCH INVENTORY (Batch-specific stock entries)
+-- 2. BATCH INVENTORY (Batch-specific stock entries with barcode support)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.inventory (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS public.inventory (
     user_id uuid DEFAULT auth.uid(),
     user_name text NOT NULL DEFAULT 'Operator',
 
+    barcode text,
     item_name text NOT NULL,
     manufacturer text NOT NULL,
     type text NOT NULL,
@@ -100,9 +101,15 @@ CREATE TABLE IF NOT EXISTS public.inventory (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Ensure barcode column exists on existing inventory tables
+ALTER TABLE public.inventory ADD COLUMN IF NOT EXISTS barcode text;
+
 -- Performance Indexes for inventory
 CREATE INDEX IF NOT EXISTS inventory_created_idx
 ON public.inventory (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS inventory_barcode_idx
+ON public.inventory (barcode);
 
 CREATE INDEX IF NOT EXISTS inventory_item_name_idx
 ON public.inventory (lower(item_name));

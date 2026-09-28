@@ -50,6 +50,7 @@ type Row = {
   manufacturer: string;
   type: string;
   batch_code: string;
+  barcode?: string;
   pack_size: string;
   no_of_pack: number;
   units: string;
@@ -150,22 +151,28 @@ function RecordsPage() {
   // Edit record mutation
   const update = useMutation({
     mutationFn: async (row: Row) => {
-      const { error } = await (supabase as any)
-        .from("inventory")
-        .update({
-          item_name: row.item_name.trim(),
-          manufacturer: row.manufacturer.trim(),
-          type: row.type.trim(),
-          batch_code: row.batch_code.trim(),
-          pack_size: row.pack_size.trim(),
-          no_of_pack: Number(row.no_of_pack),
-          units: row.units.trim(),
-          mrp: Number(row.mrp),
-          expiry_month: Number(row.expiry_month),
-          expiry_year: Number(row.expiry_year),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", row.id);
+      const payload: any = {
+        item_name: row.item_name.trim(),
+        manufacturer: row.manufacturer.trim(),
+        type: row.type.trim(),
+        batch_code: row.batch_code.trim(),
+        pack_size: row.pack_size.trim(),
+        no_of_pack: Number(row.no_of_pack),
+        units: row.units.trim(),
+        mrp: Number(row.mrp),
+        expiry_month: Number(row.expiry_month),
+        expiry_year: Number(row.expiry_year),
+        updated_at: new Date().toISOString(),
+      };
+      if (row.barcode !== undefined) {
+        payload.barcode = row.barcode ? row.barcode.trim() : null;
+      }
+      let { error } = await (supabase as any).from("inventory").update(payload).eq("id", row.id);
+      if (error && error.message?.includes("column inventory.barcode does not exist")) {
+        delete payload.barcode;
+        const retry = await (supabase as any).from("inventory").update(payload).eq("id", row.id);
+        error = retry.error;
+      }
       if (error) throw error;
     },
     onSuccess: () => {
@@ -193,7 +200,7 @@ function RecordsPage() {
 
   const uniq = (vals: (string | number)[]) => Array.from(new Set(vals.map(String).filter(Boolean))).sort();
 
-  // Search on Item Name, Manufacturer, Batch Code, Type, Units
+  // Search on Item Name, Barcode, Manufacturer, Batch Code, Type, Units
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
@@ -201,7 +208,7 @@ function RecordsPage() {
       if (fType !== ALL && r.type !== fType) return false;
       if (
         q &&
-        ![r.item_name, r.manufacturer, r.type, r.batch_code, r.units].some((v) =>
+        ![r.item_name, r.barcode, r.manufacturer, r.type, r.batch_code, r.units].some((v) =>
           v?.toLowerCase().includes(q)
         )
       ) {
@@ -213,12 +220,13 @@ function RecordsPage() {
 
   const exportCsv = () => {
     const head = [
-      "Item Name", "Manufacturer", "Type", "Batch No",
+      "Item Name", "Barcode", "Manufacturer", "Type", "Batch No",
       "Pack Size", "Qty", "Units", "MRP", "Expiry Date", "Created At",
     ];
     const lines = filtered.map((r) =>
       [
         r.item_name,
+        r.barcode || "",
         r.manufacturer,
         r.type,
         r.batch_code,
@@ -395,9 +403,18 @@ function RecordsPage() {
 
                   return (
                     <tr key={r.id} className="hover:bg-muted/30 transition-colors">
-                      {/* Item Name */}
-                      <td className="py-3 px-4 font-semibold text-foreground">
-                        {r.item_name}
+                      {/* Item Name & Barcode */}
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-foreground">
+                          {r.item_name}
+                        </div>
+                        {r.barcode && (
+                          <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <span className="px-1.5 py-0.2 bg-muted rounded border text-[10px]">
+                              {r.barcode}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Manufacturer */}
@@ -529,15 +546,27 @@ function RecordsPage() {
               }}
               className="space-y-4 pt-2"
             >
-              {/* Item Name */}
-              <div className="space-y-1">
-                <Label htmlFor="edit-name" className="text-xs font-medium">Medicine Name *</Label>
-                <Input
-                  id="edit-name"
-                  required
-                  value={editRow.item_name}
-                  onChange={(e) => setEditRow({ ...editRow, item_name: e.target.value })}
-                />
+              {/* Barcode & Medicine Name */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-barcode" className="text-xs font-medium">Barcode</Label>
+                  <Input
+                    id="edit-barcode"
+                    placeholder="e.g. 8901138821913"
+                    value={editRow.barcode || ""}
+                    onChange={(e) => setEditRow({ ...editRow, barcode: e.target.value })}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label htmlFor="edit-name" className="text-xs font-medium">Medicine Name *</Label>
+                  <Input
+                    id="edit-name"
+                    required
+                    value={editRow.item_name}
+                    onChange={(e) => setEditRow({ ...editRow, item_name: e.target.value })}
+                  />
+                </div>
               </div>
 
               {/* Company & Type */}

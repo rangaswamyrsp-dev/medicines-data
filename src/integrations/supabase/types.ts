@@ -10,6 +10,7 @@ export interface Inventory {
   id: string;
   user_id: string | null;
   user_name: string;
+  barcode?: string | null;
   item_name: string;
   manufacturer: string;
   type: string;
@@ -33,6 +34,7 @@ export type Database = {
           id?: string;
           user_id?: string | null;
           user_name?: string;
+          barcode?: string | null;
           item_name: string;
           manufacturer: string;
           type: string;
@@ -50,6 +52,7 @@ export type Database = {
           id?: string;
           user_id?: string | null;
           user_name?: string;
+          barcode?: string | null;
           item_name?: string;
           manufacturer?: string;
           type?: string;
