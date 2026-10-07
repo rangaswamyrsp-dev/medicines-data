@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AddMedicineForm } from "@/components/AddMedicineForm";
+import { DownloadStockModal } from "@/components/DownloadStockModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,10 +94,13 @@ function RecordsPage() {
   const [search, setSearch] = useState("");
   const [fMfr, setFMfr] = useState(ALL);
   const [fType, setFType] = useState(ALL);
+  const [fStock, setFStock] = useState<"all" | "in_stock" | "low_stock" | "out_of_stock">("all");
+  const [fExpiry, setFExpiry] = useState<"all" | "active" | "expiring_soon" | "expired">("all");
   const [showFilters, setShowFilters] = useState(false);
   const [editRow, setEditRow] = useState<Row | null>(null);
   const [deleteRow, setDeleteRow] = useState<Row | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   // Fetch records directly from Supabase PostgreSQL
   const { data: rows = [], isLoading } = useQuery({
@@ -200,12 +204,34 @@ function RecordsPage() {
 
   const uniq = (vals: (string | number)[]) => Array.from(new Set(vals.map(String).filter(Boolean))).sort();
 
-  // Search on Item Name, Barcode, Manufacturer, Batch Code, Type, Units
+  // Search on Item Name, Barcode, Manufacturer, Batch Code, Type, Units with Stock & Expiry filters
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth() + 1;
+
     return rows.filter((r) => {
+      // Company filter
       if (fMfr !== ALL && r.manufacturer !== fMfr) return false;
+
+      // Type filter
       if (fType !== ALL && r.type !== fType) return false;
+
+      // Stock status filter
+      if (fStock === "in_stock" && r.no_of_pack <= 0) return false;
+      if (fStock === "low_stock" && (r.no_of_pack <= 0 || r.no_of_pack > 5)) return false;
+      if (fStock === "out_of_stock" && r.no_of_pack > 0) return false;
+
+      // Expiry status filter
+      const isExp = r.expiry_year < curY || (r.expiry_year === curY && r.expiry_month < curM);
+      const mLeft = (r.expiry_year - curY) * 12 + (r.expiry_month - curM);
+      const isExpSoon = !isExp && mLeft <= 3;
+
+      if (fExpiry === "active" && isExp) return false;
+      if (fExpiry === "expiring_soon" && !isExpSoon) return false;
+      if (fExpiry === "expired" && !isExp) return false;
+
       if (
         q &&
         ![r.item_name, r.barcode, r.manufacturer, r.type, r.batch_code, r.units].some((v) =>
@@ -216,7 +242,7 @@ function RecordsPage() {
       }
       return true;
     });
-  }, [rows, search, fMfr, fType]);
+  }, [rows, search, fMfr, fType, fStock, fExpiry]);
 
   const exportCsv = () => {
     const head = [
@@ -268,9 +294,19 @@ function RecordsPage() {
             <Plus className="h-4 w-4" />
             + Add Medicine
           </Button>
-          <Button variant="outline" size="sm" onClick={exportCsv} className="h-9 gap-1.5 shadow-2xs">
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span> CSV
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExportOpen(true)}
+            className="h-9 gap-1.5 shadow-2xs font-semibold text-foreground hover:bg-muted"
+          >
+            <Download className="h-4 w-4 text-emerald-600" />
+            <span>Download Stock</span>
+            {filtered.length !== rows.length && (
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                {filtered.length}
+              </span>
+            )}
           </Button>
         </div>
       </div>
@@ -298,14 +334,14 @@ function RecordsPage() {
             )}
             <Button
               type="button"
-              variant={showFilters || fMfr !== ALL || fType !== ALL ? "secondary" : "ghost"}
+              variant={showFilters || fMfr !== ALL || fType !== ALL || fStock !== "all" || fExpiry !== "all" ? "secondary" : "ghost"}
               size="sm"
               className="h-8 px-2.5 text-xs gap-1"
               onClick={() => setShowFilters(!showFilters)}
             >
               <FilterIcon className="h-3.5 w-3.5" />
               <span className="hidden xs:inline">Filter</span>
-              {(fMfr !== ALL || fType !== ALL) && (
+              {(fMfr !== ALL || fType !== ALL || fStock !== "all" || fExpiry !== "all") && (
                 <span className="h-2 w-2 rounded-full bg-primary" />
               )}
             </Button>
@@ -314,7 +350,7 @@ function RecordsPage() {
 
         {/* Filter Drawer */}
         {showFilters && (
-          <div className="surface-card p-3 grid grid-cols-2 gap-2 text-xs animate-in fade-in slide-in-from-top-2">
+          <div className="surface-card p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 border">
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Company</Label>
               <Select value={fMfr} onValueChange={setFMfr}>
@@ -322,7 +358,7 @@ function RecordsPage() {
                   <SelectValue placeholder="All Companies" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All Companies</SelectItem>
+                  <SelectItem value={ALL}>All Companies ({rows.length})</SelectItem>
                   {uniq(rows.map((r) => r.manufacturer)).map((m) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
                   ))}
@@ -336,27 +372,72 @@ function RecordsPage() {
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All Types</SelectItem>
+                  <SelectItem value={ALL}>All Types ({rows.length})</SelectItem>
                   {uniq(rows.map((r) => r.type)).map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {(fMfr !== ALL || fType !== ALL) && (
-              <div className="col-span-2 flex justify-end">
-                <button
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Stock Status</Label>
+              <Select value={fStock} onValueChange={(v: any) => setFStock(v)}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="All Stock" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stock</SelectItem>
+                  <SelectItem value="in_stock">In Stock (Qty &gt; 0)</SelectItem>
+                  <SelectItem value="low_stock">Low Stock (≤ 5)</SelectItem>
+                  <SelectItem value="out_of_stock">Out of Stock (0)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">Expiry Status</Label>
+              <Select value={fExpiry} onValueChange={(v: any) => setFExpiry(v)}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="All Expiry" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Expiry</SelectItem>
+                  <SelectItem value="active">Active Safe</SelectItem>
+                  <SelectItem value="expiring_soon">Expiring Soon (3m)</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 sm:col-span-4 flex items-center justify-between pt-1 border-t">
+              <span className="text-xs text-muted-foreground">
+                Showing <strong>{filtered.length}</strong> of {rows.length} medicines
+              </span>
+              <div className="flex items-center gap-2">
+                {(fMfr !== ALL || fType !== ALL || fStock !== "all" || fExpiry !== "all") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFMfr(ALL);
+                      setFType(ALL);
+                      setFStock("all");
+                      setFExpiry("all");
+                    }}
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Reset filters
+                  </button>
+                )}
+                <Button
                   type="button"
-                  onClick={() => {
-                    setFMfr(ALL);
-                    setFType(ALL);
-                  }}
-                  className="text-xs text-primary hover:underline font-medium"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsExportOpen(true)}
+                  className="h-7 text-xs gap-1"
                 >
-                  Reset filters
-                </button>
+                  <Download className="h-3.5 w-3.5" />
+                  Download Filtered ({filtered.length})
+                </Button>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
@@ -750,6 +831,16 @@ function RecordsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Advanced Download & Filter Stock Modal */}
+      <DownloadStockModal
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        rows={rows}
+        initialManufacturer={fMfr}
+        initialType={fType}
+        initialSearch={search}
+      />
     </div>
   );
 }

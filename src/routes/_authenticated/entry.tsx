@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ClipboardList, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AddMedicineForm } from "@/components/AddMedicineForm";
+import { DownloadStockModal } from "@/components/DownloadStockModal";
 
 export const Route = createFileRoute("/_authenticated/entry")({
   head: () => ({
@@ -17,6 +19,26 @@ export const Route = createFileRoute("/_authenticated/entry")({
 });
 
 function EntryPage() {
+  const [isExportOpen, setIsExportOpen] = useState(false);
+
+  // Fetch full inventory for filtered stock download
+  const stockQuery = useQuery({
+    queryKey: ["records"],
+    queryFn: async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from("inventory")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(2000);
+        if (error) return [];
+        return (data ?? []) as any[];
+      } catch {
+        return [];
+      }
+    },
+  });
+
   const recent = useQuery({
     queryKey: ["recent-entries"],
     queryFn: async () => {
@@ -77,12 +99,16 @@ function EntryPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={exportExcel}
-          className="h-9 gap-1.5 shadow-2xs"
-          disabled={!recent.data || recent.data.length === 0}
+          onClick={() => setIsExportOpen(true)}
+          className="h-9 gap-1.5 shadow-2xs font-semibold text-foreground hover:bg-muted"
         >
-          <Download className="h-4 w-4" />
-          <span>Download Excel ({recent.data?.length || 0})</span>
+          <Download className="h-4 w-4 text-emerald-600" />
+          <span>Download Stock</span>
+          {stockQuery.data?.length ? (
+            <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+              {stockQuery.data.length}
+            </span>
+          ) : null}
         </Button>
       </div>
 
@@ -115,6 +141,13 @@ function EntryPage() {
           <p className="mt-2 text-sm text-muted-foreground">No entries yet. Scan a barcode above to add one.</p>
         )}
       </div>
+
+      {/* Advanced Download & Filter Stock Modal */}
+      <DownloadStockModal
+        open={isExportOpen}
+        onOpenChange={setIsExportOpen}
+        rows={stockQuery.data ?? []}
+      />
     </div>
   );
 }
